@@ -6,6 +6,8 @@ import time
 import uuid
 
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
+from fastapi.responses import Response
+from starlette.middleware.base import RequestResponseEndpoint
 
 from slopguard.core.lifespan import lifespan
 from slopguard.core.security import verify_signature
@@ -24,7 +26,7 @@ def create_app() -> FastAPI:
     service = WebhookService(settings)
 
     @app.middleware("http")
-    async def log_http_request(request: Request, call_next):
+    async def log_http_request(request: Request, call_next: RequestResponseEndpoint) -> Response:
         request_id = request.headers.get("X-Request-ID", uuid.uuid4().hex[:12])
         started = time.perf_counter()
         logger.debug("request_started id=%s method=%s path=%s", request_id, request.method, request.url.path)

@@ -21,6 +21,7 @@ def build_llm(settings: Settings) -> ChatOpenAI:
         api_key=settings.llm_api_key,
         base_url=settings.llm_base_url,
         temperature=0,
+        timeout=settings.llm_timeout_seconds,
         model_kwargs={"max_tokens": settings.llm_max_tokens},
     )
 
