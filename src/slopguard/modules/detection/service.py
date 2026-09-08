@@ -21,6 +21,8 @@ class DetectionService:
         initial = DetectionState(title=title, body=body, subject_kind=subject_kind)
         result: dict[str, Any] = await self._graph.ainvoke({"state": initial})
         state = cast(DetectionState, result["state"])
+        if state.token_limit_response is not None:
+            return state
         if state.assessment is None:
             raise RuntimeError("Detection graph returned no assessment")
         verdict = self._apply_threshold(state.assessment)

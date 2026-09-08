@@ -46,3 +46,4 @@ class DetectionState(BaseModel):
     heuristic: HeuristicReport | None = None
     assessment: DetectionAssessment | None = None
     verdict: DetectionVerdict | None = None
+    token_limit_response: str | None = None

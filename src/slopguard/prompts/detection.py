@@ -39,3 +39,12 @@ def render_comment(verdict: str, probability: float, reasons: list[str], caveat:
         f"**AI likelihood:** {probability:.0%}\n\n**Why:**\n{evidence}\n\n"
         f"_Caveat: {caveat}_\n"
     )
+
+
+def render_token_limit_comment(partial_response: str) -> str:
+    """Render a transparent comment when the model response was truncated."""
+    partial = partial_response.strip() or "No response content was received."
+    return (
+        f"{COMMENT_HEADER}\n### SlopGuard analysis\n\n{partial}\n\n"
+        "_[CUT BY TOKEN LIMIT — the analysis was truncated before completion.]_\n"
+    )

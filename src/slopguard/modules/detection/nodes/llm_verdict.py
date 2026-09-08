@@ -2,7 +2,9 @@
 
 import logging
 import time
+from typing import Any
 
+import openai
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
@@ -12,6 +14,17 @@ from slopguard.modules.detection.nodes.rubric import build_rubric_context
 from slopguard.prompts.detection import SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
+
+
+def _partial_response(error: openai.LengthFinishReasonError) -> str:
+    """Extract the text generated before the provider hit its token limit."""
+    choices: Any = getattr(error.completion, "choices", [])
+    if not choices:
+        return ""
+    content = getattr(getattr(choices[0], "message", None), "content", None)
+    if isinstance(content, str):
+        return content
+    return ""
 
 
 def build_llm(settings: Settings) -> ChatOpenAI:
@@ -42,6 +55,15 @@ async def adjudicate(state: DetectionState, settings: Settings) -> DetectionStat
                 "signals": build_rubric_context(state.heuristic) if state.heuristic else "None",
             }
         )
+    except openai.LengthFinishReasonError as error:
+        partial = _partial_response(error)
+        logger.warning(
+            "llm_request_truncated model=%s duration_ms=%.1f partial_chars=%s",
+            settings.llm_model,
+            (time.perf_counter() - started) * 1000,
+            len(partial),
+        )
+        return state.model_copy(update={"token_limit_response": partial})
     except Exception:
         logger.exception("llm_request_failed model=%s duration_ms=%.1f", settings.llm_model, (time.perf_counter() - started) * 1000)
         raise

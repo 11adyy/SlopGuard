@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     llm_model: str = Field(default="gpt-4o-mini", alias="LLM_MODEL")
     llm_max_tokens: int = Field(default=1024, alias="LLM_MAX_TOKENS", ge=128, le=8192)
     llm_timeout_seconds: float = Field(default=180.0, alias="LLM_TIMEOUT_SECONDS", gt=0)
+    send_on_token_limit: bool = Field(default=True, alias="SEND_ON_TOKEN_LIMIT")
     ai_detection_threshold: float = Field(default=0.50, alias="AI_DETECTION_THRESHOLD", ge=0, le=1)
     reanalysis_change_threshold: float = Field(
         default=0.50, alias="REANALYSIS_CHANGE_THRESHOLD", ge=0, le=1

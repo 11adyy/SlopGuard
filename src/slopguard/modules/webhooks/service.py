@@ -9,7 +9,7 @@ from slopguard.modules.github.client import GitHubClient
 from slopguard.modules.github.models import ActionResult
 from slopguard.modules.webhooks.change_gate import should_analyze
 from slopguard.modules.webhooks.schemas import WebhookPayload
-from slopguard.prompts.detection import COMMENT_HEADER, render_comment
+from slopguard.prompts.detection import COMMENT_HEADER, render_comment, render_token_limit_comment
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +48,21 @@ class WebhookService:
 
         item = payload.item
         state = await self._detection.analyze(item.title, item.body or "", payload.subject_kind)
+        if state.token_limit_response is not None:
+            if not self._settings.send_on_token_limit:
+                logger.warning("token_limit_comment_skipped reason=configuration_disabled")
+                return ActionResult(status="ignored")
+            comment = render_token_limit_comment(state.token_limit_response)
+            await self._github.upsert_comment(
+                payload.repository.full_name, item.number, payload.installation.id, comment, COMMENT_HEADER
+            )
+            logger.warning(
+                "analysis_truncated_comment_sent repository=%s number=%s subject=%s",
+                payload.repository.full_name,
+                item.number,
+                payload.subject_kind,
+            )
+            return ActionResult(status="processed")
         if state.verdict is None:
             raise RuntimeError("Analysis completed without a verdict")
         comment = render_comment(
