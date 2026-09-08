@@ -1,6 +1,8 @@
 """Public webhook URL discovery and GitHub App synchronization."""
 
 import ipaddress
+import logging
+import time
 from ipaddress import IPv4Address, IPv6Address
 
 import httpx
@@ -8,6 +10,8 @@ import httpx
 from slopguard.core.settings import Settings
 from slopguard.modules.github.client import GitHubClient
 from slopguard.modules.github.hosting import detect_hosted_base_url
+
+logger = logging.getLogger(__name__)
 
 
 class WebhookUrlSynchronizer:
@@ -21,8 +25,11 @@ class WebhookUrlSynchronizer:
 
     async def discover_public_ip(self) -> IPv4Address | IPv6Address:
         """Fetch and validate the machine's public IP address."""
+        started = time.perf_counter()
+        logger.debug("public_ip_request_started url=%s", self._settings.public_ip_discovery_url)
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(self._settings.public_ip_discovery_url)
+            logger.debug("public_ip_request_finished status=%s duration_ms=%.1f", response.status_code, (time.perf_counter() - started) * 1000)
             response.raise_for_status()
         value = response.text.strip()
         try:

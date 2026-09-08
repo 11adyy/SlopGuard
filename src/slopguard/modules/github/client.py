@@ -1,11 +1,15 @@
 """Minimal asynchronous GitHub App REST client."""
 
+import logging
+import time
 from typing import Any
 
 import httpx
 
 from slopguard.modules.github.auth import build_app_jwt
 from slopguard.modules.github.models import AppWebhookConfiguration, CommentRef
+
+logger = logging.getLogger(__name__)
 
 
 class GitHubClient:
@@ -19,11 +23,15 @@ class GitHubClient:
     async def _installation_token(self, installation_id: int) -> str:
         """Create an installation access token."""
         app_jwt = build_app_jwt(self._app_id, self._private_key)
+        started = time.perf_counter()
+        path = f"/app/installations/{installation_id}/access_tokens"
+        logger.debug("github_request_started method=POST path=%s", path)
         async with httpx.AsyncClient(base_url="https://api.github.com", timeout=self._timeout) as client:
             response = await client.post(
-                f"/app/installations/{installation_id}/access_tokens",
+                path,
                 headers={"Authorization": f"Bearer {app_jwt}", "Accept": "application/vnd.github+json"},
             )
+            logger.debug("github_request_finished method=POST path=%s status=%s duration_ms=%.1f", path, response.status_code, (time.perf_counter() - started) * 1000)
             response.raise_for_status()
             return str(response.json()["token"])
 
@@ -34,10 +42,23 @@ class GitHubClient:
         token = await self._installation_token(installation_id)
         headers = kwargs.pop("headers", {})
         headers.update({"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"})
-        async with httpx.AsyncClient(base_url="https://api.github.com", timeout=self._timeout) as client:
-            response = await client.request(method, path, headers=headers, **kwargs)
-            response.raise_for_status()
-            return response
+        started = time.perf_counter()
+        logger.debug("github_request_started method=%s path=%s", method, path)
+        try:
+            async with httpx.AsyncClient(base_url="https://api.github.com", timeout=self._timeout) as client:
+                response = await client.request(method, path, headers=headers, **kwargs)
+        except Exception:
+            logger.exception("github_request_failed method=%s path=%s duration_ms=%.1f", method, path, (time.perf_counter() - started) * 1000)
+            raise
+        logger.debug(
+            "github_request_finished method=%s path=%s status=%s duration_ms=%.1f",
+            method,
+            path,
+            response.status_code,
+            (time.perf_counter() - started) * 1000,
+        )
+        response.raise_for_status()
+        return response
 
     async def _app_request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         """Send a GitHub App JWT-authenticated request."""
@@ -50,10 +71,23 @@ class GitHubClient:
                 "X-GitHub-Api-Version": "2022-11-28",
             }
         )
-        async with httpx.AsyncClient(base_url="https://api.github.com", timeout=self._timeout) as client:
-            response = await client.request(method, path, headers=headers, **kwargs)
-            response.raise_for_status()
-            return response
+        started = time.perf_counter()
+        logger.debug("github_request_started method=%s path=%s auth=app_jwt", method, path)
+        try:
+            async with httpx.AsyncClient(base_url="https://api.github.com", timeout=self._timeout) as client:
+                response = await client.request(method, path, headers=headers, **kwargs)
+        except Exception:
+            logger.exception("github_request_failed method=%s path=%s duration_ms=%.1f", method, path, (time.perf_counter() - started) * 1000)
+            raise
+        logger.debug(
+            "github_request_finished method=%s path=%s status=%s duration_ms=%.1f",
+            method,
+            path,
+            response.status_code,
+            (time.perf_counter() - started) * 1000,
+        )
+        response.raise_for_status()
+        return response
 
     async def update_app_webhook_url(self, url: str) -> None:
         """Update the App webhook URL without changing its secret."""
@@ -106,16 +140,40 @@ class GitHubClient:
         """Add the current verdict label and remove its opposite."""
         token = await self._installation_token(installation_id)
         headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
+        add_path = f"/repos/{repository}/issues/{number}/labels"
+        started = time.perf_counter()
+        logger.debug("github_request_started method=POST path=%s", add_path)
         async with httpx.AsyncClient(base_url="https://api.github.com", timeout=self._timeout) as client:
             add_response = await client.post(
-                f"/repos/{repository}/issues/{number}/labels",
+                add_path,
                 headers=headers,
                 json={"labels": [current_label]},
             )
+            logger.debug(
+                "github_request_finished method=POST path=%s status=%s duration_ms=%.1f",
+                add_path,
+                add_response.status_code,
+                (time.perf_counter() - started) * 1000,
+            )
             add_response.raise_for_status()
             opposite = human_label if current_label == ai_label else ai_label
-            remove_response = await client.delete(
-                f"/repos/{repository}/issues/{number}/labels/{opposite}", headers=headers
+            remove_path = f"/repos/{repository}/issues/{number}/labels/{opposite}"
+            started = time.perf_counter()
+            logger.debug("github_request_started method=DELETE path=%s", remove_path)
+            try:
+                remove_response = await client.delete(remove_path, headers=headers)
+            except Exception:
+                logger.exception(
+                    "github_request_failed method=DELETE path=%s duration_ms=%.1f",
+                    remove_path,
+                    (time.perf_counter() - started) * 1000,
+                )
+                raise
+            logger.debug(
+                "github_request_finished method=DELETE path=%s status=%s duration_ms=%.1f",
+                remove_path,
+                remove_response.status_code,
+                (time.perf_counter() - started) * 1000,
             )
             if remove_response.status_code not in {200, 204, 404}:
                 remove_response.raise_for_status()

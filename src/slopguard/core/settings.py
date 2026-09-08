@@ -7,6 +7,7 @@ from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Action = Literal["tag", "comment", "close", "nothing"]
+LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 
 class Settings(BaseSettings):
@@ -20,6 +21,7 @@ class Settings(BaseSettings):
     llm_api_key: SecretStr = Field(alias="LLM_API_KEY")
     server_host: str = Field(default="0.0.0.0", alias="SERVER_HOST")
     server_port: int = Field(default=8000, alias="SERVER_PORT", ge=1, le=65535)
+    log_level: LogLevel = Field(default="DEBUG", alias="LOG_LEVEL")
     platform_port: int | None = Field(default=None, alias="PORT", ge=1, le=65535)
     public_webhook_scheme: Literal["http", "https"] = Field(
         default="http", alias="PUBLIC_WEBHOOK_SCHEME"

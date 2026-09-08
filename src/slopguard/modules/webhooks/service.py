@@ -26,13 +26,24 @@ class WebhookService:
 
     async def handle(self, event: str, payload: WebhookPayload) -> ActionResult:
         """Handle one verified GitHub webhook delivery."""
+        logger.debug(
+            "webhook_processing_started event=%s repository=%s number=%s subject=%s",
+            event,
+            payload.repository.full_name,
+            payload.item.number,
+            payload.subject_kind,
+        )
         if event not in {"issues", "pull_request"}:
+            logger.debug("webhook_ignored reason=unsupported_event event=%s", event)
             return ActionResult(status="ignored")
         if payload.subject_kind == "pull_request" and event != "pull_request":
+            logger.debug("webhook_ignored reason=event_subject_mismatch")
             return ActionResult(status="ignored")
         if payload.subject_kind == "issue" and event != "issues":
+            logger.debug("webhook_ignored reason=event_subject_mismatch")
             return ActionResult(status="ignored")
         if not should_analyze(payload, self._settings.reanalysis_change_threshold):
+            logger.debug("webhook_ignored reason=change_gate")
             return ActionResult(status="ignored")
 
         item = payload.item

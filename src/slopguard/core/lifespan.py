@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     """Initialize and finalize process-wide application resources."""
-    configure_logging()
     settings = get_settings()
+    configure_logging(settings.log_level)
     if settings.ip_sync:
         webhook_url = await WebhookUrlSynchronizer(settings).synchronize()
         logger.info("github webhook synchronized url=%s", webhook_url)
