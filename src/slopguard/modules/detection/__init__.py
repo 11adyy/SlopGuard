@@ -1,0 +1,1 @@
+"""AI-writing detection domain."""

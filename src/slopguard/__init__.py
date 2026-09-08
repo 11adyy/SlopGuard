@@ -1,0 +1,1 @@
+"""SlopGuard application package."""

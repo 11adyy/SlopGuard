@@ -1,0 +1,1 @@
+"""GitHub webhook domain module."""
